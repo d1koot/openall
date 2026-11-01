@@ -76,16 +76,23 @@ IDs come from the address, not from a counter, so a re-run never breaks existing
 
 ```markdown
 # F:00001506
-summary: Reads whitespace-separated words from a file handle and counts how often each occurs. [I]
-inputs: file handle; pointer to a list head.
-effects: allocates memory; reads from the file; returns the number of words read.
+title: read words into a counted list
+summary: Reads words from a file handle and counts each distinct word; returns the total. [I]
+inputs: a file handle; the address of a list head pointer.
+effects: reads the file; allocates nodes; returns the word total.
 evidence:
-- F:00001a40 is called once per word and matches the shape of a string-compare loop. [O]
-- I:msvcrt.dll!tolower is called on every character before comparison. [O]
+- Each buffer character goes through the import tolower and is written back. [I] refs: I:msvcrt.dll!tolower
+- On a zero strcmp result the counter at offset 8 of the node is incremented. [O] refs: F:0000e8b0, I:msvcrt.dll!strcmp
+- The compiler probably merged several source functions into this one. [G]
 confidence: medium
-children_read: F:00001a40, F:00001b10
-open_questions: why the buffer limit is 255.
+children_read: F:000014e4, F:0000e880, F:0000e8b0
+open_questions: exact identity of F:000014e4.
 ```
+
+A claim is one bullet ending in a label: `[O]` observed in the shelf data, `[I]` inferred from it, `[D]` public
+documentation, `[G]` guess. `[O]` and `[I]` need `refs:`. Runtime and library functions get generated one-line
+`stub` pages (a thunk is named after its import). A page `OVERVIEW.md` holds the book’s opening claims in the
+same format.
 
 ## 3. Origin classes (this solves the biggest scale problem)
 
@@ -144,15 +151,22 @@ no help to defeat protection (a packed file is described, not unpacked).
 
 ## 6. The checker (the part that catches invention)
 
-A script, not a model. It fails the book when:
+`scripts/shelf3.py check`, a script, not a model. Implemented rules; a page fails when:
 
-- a sentence cites a record that does not exist on shelves 0 to 2;
-- a claim labelled `[O]` has no cited record, or `[I]` has fewer than one;
-- a function page exists for an ID that is not on shelf 1;
-- a book chapter mentions a function that has no shelf 3 page;
-- the public render contains an address-like or identifier-like token.
+- a claim has no label, or an `[O]`/`[I]` claim has no `refs`;
+- a cited record does not exist on any shelf;
+- a cited record is **not connected** to the function (not one of its callees, callers, strings, imports, data, or
+  the import behind a callee thunk). This stops a page from borrowing evidence that belongs to another function;
+- `confidence: high` without at least two evidence bullets that cite valid records;
+- `children_read` does not list every callee, or a callee has no page yet (bottom-up order is enforced);
+- the page contains something that looks like a secret or token;
+- an own/unknown function has no page, or `OVERVIEW.md` is missing.
 
-It cannot prove a claim is true. It can prove a claim is **grounded**, which is the minimum for a trustworthy book.
+The book (`shelf3.py book`) refuses to render while the check fails.
+
+What it cannot do: prove a claim is **true**. A claim with real, connected references can still be wrong. It proves
+claims are **grounded** and visible to a reviewer, which is the minimum for a trustworthy book. Not yet implemented:
+the public render check (no addresses, identifiers or code excerpts).
 
 ## 7. Testing without anyone else’s software
 
@@ -228,10 +242,24 @@ Still open:
 
 | Piece | State |
 |---|---|
-| Shelf 0, 1, 2 builder for PE x64 | prototype, tested on our own builds only |
-| Origin classification by reference builds | prototype, see limits above |
-| Bottom-up order | done (`bottom_up.json`) |
-| Shelf 3 (meaning) loop | not started |
-| Checker | not started |
-| Book renderer | not started |
+| Shelf 0, 1, 2 builder for PE x64 (`build_shelves.py`) | prototype, tested on our own builds only |
+| Origin classification (reference builds, import thunks named after the import) | prototype, see limits above |
+| Bottom-up order and task packets (`shelf3.py next`) | prototype |
+| Stub pages, checker, status, private book (`shelf3.py`) | prototype |
+| Shelf 3 pages written by Claude | done by hand on the 57-line test program (2 functions); not automated yet |
+| Public render mode | not started |
+| Splitting very large functions | not started (packets carry the whole function) |
 | Ghidra export to the same format | not started |
+
+### First end-to-end result (own test program, 2 functions)
+
+Both pages and the overview were written from the task packets only, then compared with the real source:
+
+- every call target the pages name matches the source (`malloc`, `strcmp`, `fopen`, `fclose`, `free`, `perror`
+  from thunks; the print, scan and stream calls were inferred and labelled `[I]`);
+- the list node layout (word at 0, counter at 8, next at 0x10), the lower-casing, the djb2 hash, the return codes
+  0/1/2 and the release loop all match the source;
+- nothing in the pages contradicts the source. The things left open were labelled as open.
+
+Caveat: one tiny program, written by the same model that wrote the pages in a single sitting. It shows the loop
+works; it does not show the loop scales to large programs, other toolchains or optimised code with heavy inlining.
