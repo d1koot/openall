@@ -1,0 +1,17 @@
+# analysis output and working files (can contain facts about programs you studied: keep them private)
+workspace/
+out/
+*_book.zip
+*_progress.zip
+
+# programs under study and compiled test programs: never commit binaries
+input/*
+!input/.gitkeep
+*.exe
+*.dll
+*.obj
+
+# python
+__pycache__/
+*.pyc
+.venv/
