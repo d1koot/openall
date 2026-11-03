@@ -5,7 +5,7 @@ OpenAll has two modes. Reply in the language the user writes in.
 - **STUDY mode (default, v0.2)**: understand someone's program or code deeply and explain it. Claude reads, decompiles
   (Ghidra and other engines through MCP), traces, thinks, and writes a knowledge base and report. Claude writes NO
   product code of its own in this mode; it only works with what the user gave it. Commands: `/openall-study`,
-  `/openall-ask`, `/openall-tools`. Role: `researcher`.
+  `/openall-ask`, `/openall-tools`, `/openall-shelves`. Roles: `researcher`, `shelf-writer`.
 - **REBUILD mode (optional, only if the user explicitly asks to re-create an app)**: the clean-room pipeline below
   (analyst -> builder -> verifier). Rule 3 (no copying) applies to this mode only.
 
@@ -22,6 +22,17 @@ Hard rules 1, 2, 4, 5, 6 apply in BOTH modes.
 - Prefer engines over guessing: if an MCP engine (ReVa/REA) is connected, use it for decompilation, xrefs and call graphs.
   If none is connected, say so in one sentence, use `scripts/binary_inventory.py` and static reading, and point to `/openall-tools`.
 - Keep `workspace/PROGRESS.md` and `workspace/study/KNOWLEDGE.md` up to date so the work survives between sessions.
+
+## Shelves workflow (compiled Windows PE x64 programs, STUDY mode)
+For a Windows x64 `.exe`/`.dll` prefer `/openall-shelves` (format in `docs/FORMAT.md`; no decompiler needed).
+- **Facts come from scripts, meaning comes from Claude.** `scripts/build_shelves.py` writes shelves 0-2
+  (container, functions and call graph, data and vtables) into `workspace/shelves/<name>/`. Never edit those files by hand.
+- **One page per own function, written from the task packet only** (`scripts/shelf3.py next`), callees first,
+  by the `shelf-writer` subagent. Every claim carries `[O]` `[I]` `[D]` `[G]` and, for `[O]`/`[I]`, `refs:` to records
+  that exist and belong to that function. `scripts/shelf3.py check` must pass before anything is called done.
+- **The checker proves grounding, not truth.** Say so when reporting. Labels stay honest; unknowns go to `open_questions`.
+- A reference set (`refsets/`) is only valid for the compiler that made it. Without one, say that classification is weak.
+- In this workflow `input/` binaries are read only by the scripts, not by Claude directly.
 
 ## Default behaviour (no menus)
 If the user just drops files (or this zip) with no instructions, do NOT offer a menu of options and do not ask
