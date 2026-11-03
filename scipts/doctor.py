@@ -88,6 +88,14 @@ def main():
         val = os.environ.get(var)
         print(f"  [{'OK     ' if val else 'unset  '}] {var:20} {why}" + (f" = {val}" if val else ""))
     print()
+    import importlib.util
+    print("== python packages (shelves workflow for Windows x64 programs)")
+    pk_ok = True
+    for mod in ("capstone", "pefile"):
+        ok = importlib.util.find_spec(mod) is not None
+        pk_ok = pk_ok and ok
+        print(f"  [{'OK     ' if ok else 'absent '}] {mod:16} " + ("" if ok else "-> pip install capstone pefile   (offline: pip install --no-index --find-links vendor capstone pefile)"))
+    print()
     mcp_ok = ready.get("mcp-reva") or ready.get("rea-mcp")
     native_ok = ready.get("analyzeHeadless") or ready.get("rizin") or ready.get("r2")
     print("== summary")
@@ -96,6 +104,7 @@ def main():
         print("     install an MCP bridge, then run: python3 scripts/setup_mcp.py")
     if not native_ok:
         print("     install Ghidra (or Rizin) for real decompilation")
+    print("  shelves study of Windows x64 .exe/.dll (no Ghidra needed):", "READY" if pk_ok else "needs: pip install capstone pefile")
     print("  source-code / web / Electron study: READY (no extra tools needed)")
     print("\nOptional tools unlock deeper analysis; install only what your target needs.")
     print("Run unknown executables only in a VM or sandbox.")
